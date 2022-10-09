@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
 )
@@ -13,8 +14,7 @@ var (
 
 type Client struct {
 	connection *websocket.Conn
-
-	send chan []byte
+	send       chan []byte
 }
 
 func (client *Client) readPipe() {
@@ -43,7 +43,12 @@ func (client *Client) writePipe() {
 		select {
 		case message, ok := <-client.send:
 			if !ok {
-				client.connection.WriteMessage(websocket.CloseMessage, []byte{})
+				closeResponse := Response{
+					Data:   map[string]interface{}{"message": message},
+					Status: "ok",
+				}
+
+				client.connection.WriteJSON(closeResponse)
 			}
 
 			writer, writerError := client.connection.NextWriter(websocket.TextMessage)
@@ -52,13 +57,22 @@ func (client *Client) writePipe() {
 				return
 			}
 
-			writer.Write(message)
+			messageResponse := Response{
+				Data:   map[string]interface{}{"message": string(message)},
+				Status: "ok",
+			}
+
+			json.NewEncoder(writer).Encode(messageResponse)
 
 			queueCount := len(client.send)
 
 			for i := 0; i < queueCount; i++ {
-				writer.Write(newline)
-				writer.Write(<-client.send)
+				queuedMessageResponse := Response{
+					Data:   map[string]interface{}{"message": string(<-client.send)},
+					Status: "ok",
+				}
+
+				json.NewEncoder(writer).Encode(queuedMessageResponse)
 			}
 
 			if writerCloseError := writer.Close(); writerCloseError != nil {

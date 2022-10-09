@@ -52,7 +52,12 @@ func ServeWs(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	writeError := connection.WriteMessage(1, []byte("connected"))
+	connectedResponse := Response{
+		Data:   map[string]interface{}{"message": "connected"},
+		Status: "ok",
+	}
+
+	writeError := connection.WriteJSON(connectedResponse)
 
 	if writeError != nil {
 		log.Println(writeError)
@@ -71,12 +76,14 @@ func run() {
 		case client := <-register:
 			clients[client] = true
 		case client := <-unregister:
+
 			if _, ok := clients[client]; ok {
 				delete(clients, client)
 				close(client.send)
 			}
 
 		case message := <-broadcast:
+
 			for client := range clients {
 				select {
 				case client.send <- message:
@@ -85,6 +92,7 @@ func run() {
 					delete(clients, client)
 				}
 			}
+
 		}
 	}
 }

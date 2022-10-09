@@ -42,12 +42,13 @@
                     appendLog(item);
                 };
                 connection.onmessage = function (evt) {
-                    let messages = evt.data.split('\n');
-                    for (let i = 0; i < messages.length; i++) {
-                        let item = document.createElement("div");
-                        item.innerText = messages[i];
-                        appendLog(item);
-                    }
+                    let response = JSON.parse(evt.data);
+                    console.log(response)
+                    let item = document.createElement("div");
+
+                    item.innerText = response.data.message;
+
+                    appendLog(item);
                 };
             } else {
                 let item = document.createElement("div");
