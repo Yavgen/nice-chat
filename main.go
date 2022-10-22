@@ -14,7 +14,7 @@ var upgrader = websocket.Upgrader{
 }
 
 var (
-	broadcast  = make(chan []byte)
+	broadcast  = make(chan *Request)
 	register   = make(chan *Client)
 	unregister = make(chan *Client)
 	clients    = make(map[*Client]bool)
@@ -64,7 +64,7 @@ func ServeWs(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	connectedClient := &Client{connection: connection, send: make(chan []byte, 255)}
+	connectedClient := &Client{connection: connection, send: make(chan *Request, 255)}
 	register <- connectedClient
 	go connectedClient.readPipe()
 	go connectedClient.writePipe()

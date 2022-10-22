@@ -29,7 +29,13 @@
                 if (!message.value) {
                     return false;
                 }
-                connection.send(message.value);
+
+                const Request = {};
+                Request.token = 'test';
+                Request.message = message.value;
+                Request.room = 'roooooom';
+
+                connection.send(JSON.stringify(Request));
                 message.value = "";
                 return false;
             };

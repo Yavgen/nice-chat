@@ -7,14 +7,9 @@ import (
 	"log"
 )
 
-var (
-	newline = []byte{'\n'}
-	space   = []byte{' '}
-)
-
 type Client struct {
 	connection *websocket.Conn
-	send       chan []byte
+	send       chan *Request
 }
 
 func (client *Client) readPipe() {
@@ -29,8 +24,12 @@ func (client *Client) readPipe() {
 			break
 		}
 
-		message = bytes.Replace(message, newline, space, -1)
-		broadcast <- message
+		var request Request
+		decoder := json.NewDecoder(bytes.NewReader(message))
+		if decodeError := decoder.Decode(&request); decodeError != nil {
+			log.Fatal(decodeError)
+		}
+		broadcast <- &request
 	}
 }
 
@@ -41,10 +40,10 @@ func (client *Client) writePipe() {
 
 	for {
 		select {
-		case message, ok := <-client.send:
+		case request, ok := <-client.send:
 			if !ok {
 				closeResponse := Response{
-					Data:   map[string]interface{}{"message": message},
+					Data:   map[string]interface{}{"message": "connection closed"},
 					Status: "ok",
 				}
 
@@ -58,7 +57,7 @@ func (client *Client) writePipe() {
 			}
 
 			messageResponse := Response{
-				Data:   map[string]interface{}{"message": string(message)},
+				Data:   map[string]interface{}{"message": request.Message},
 				Status: "ok",
 			}
 
@@ -67,8 +66,9 @@ func (client *Client) writePipe() {
 			queueCount := len(client.send)
 
 			for i := 0; i < queueCount; i++ {
+				queuedRequest := <-client.send
 				queuedMessageResponse := Response{
-					Data:   map[string]interface{}{"message": string(<-client.send)},
+					Data:   map[string]interface{}{"message": queuedRequest.Message},
 					Status: "ok",
 				}
 
