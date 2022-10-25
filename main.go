@@ -20,6 +20,14 @@ var (
 	clients    = make(map[*Client]bool)
 )
 
+const createRoomAction = "createRoom"
+const messageAction = "message"
+
+const appendRoomEvent = "appendRoom"
+const messageEvent = "message"
+const connectedEvent = "connected"
+const connectionClosedEvent = "connectionClosed"
+
 func main() {
 	go run()
 	router := mux.NewRouter()
@@ -55,6 +63,7 @@ func ServeWs(writer http.ResponseWriter, request *http.Request) {
 	connectedResponse := Response{
 		Data:   map[string]interface{}{"message": "connected"},
 		Status: "ok",
+		Event:  messageEvent,
 	}
 
 	writeError := connection.WriteJSON(connectedResponse)

@@ -14,12 +14,37 @@
             let message = document.getElementById("message");
             let log = document.getElementById("log");
 
-            function appendLog(item) {
+            function appendLog(message) {
                 const doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
+                let item = document.createElement("div");
+                item.innerText = message;
                 log.appendChild(item);
                 if (doScroll) {
                     log.scrollTop = log.scrollHeight - log.clientHeight;
                 }
+            }
+
+            function createRoom() {
+                if (!connection) {
+                    return false;
+                }
+
+                const request = makeRequest('roomCreate', {'roomName': 'maggot'})
+
+                connection.send(JSON.stringify(request));
+            }
+
+            function appendRoom(name) {
+                const parent = addButton.parentElement;
+                parent.insertAdjacentHTML("beforebegin", `<li class="nav-item"><a class="nav-link" href="#">name</a></li>`)
+            }
+
+            function makeRequest(action, data) {
+                return {
+                    token: 'test',
+                    data: data,
+                    action: action
+                };
             }
 
             document.getElementById("form").onsubmit = function () {
@@ -30,15 +55,17 @@
                     return false;
                 }
 
-                const Request = {};
-                Request.token = 'test';
-                Request.message = message.value;
-                Request.room = 'roooooom';
+                const request = makeRequest('message', {
+                    message: message.value,
+                    room: 'roooooom'
+                })
 
-                connection.send(JSON.stringify(Request));
+                connection.send(JSON.stringify(request));
                 message.value = "";
                 return false;
             };
+            const addButton = document.getElementById("addButton");
+            addButton.addEventListener("click", createRoom);
 
             if (window["WebSocket"]) {
                 connection = new WebSocket("ws://" + document.location.host + "/ws");
@@ -49,12 +76,15 @@
                 };
                 connection.onmessage = function (evt) {
                     let response = JSON.parse(evt.data);
-                    console.log(response)
-                    let item = document.createElement("div");
 
-                    item.innerText = response.data.message;
-
-                    appendLog(item);
+                    switch (response.event) {
+                        case 'message':
+                            appendLog(response.data.message);
+                            break;
+                        case 'appendRoom':
+                            appendRoom(response.data.room)
+                            break;
+                    }
                 };
             } else {
                 let item = document.createElement("div");
@@ -67,19 +97,37 @@
 <style>
     .box {
         display: flex;
-        justify-content: space-between;
         flex-direction: column;
         height: 100vh;
-        padding: 2rem;
+        padding: 1rem;
     }
+
+    .form-text {
+        outline: none;
+    }
+
+    .add-button {
+        border: none !important;
+    }
+
 </style>
 <body>
 <div class="container">
-    <div class="box">
-        <div class="py-2" id="log"></div>
-        <form class="mx-auto w-100" id="form">
-            <input type="text" class="form-text" id="message" size="64" autofocus>
-            <button class="btn btn-primary" type="submit">Send</button>
+    <div class="box w-50 mx-auto border border-primary rounded">
+        <div class="h-20">
+            <ul class="nav nav-tabs">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#">Active</a>
+                </li>
+                <li class="nav-item">
+                    <a id="addButton" class="nav-link add-button" href="#">Add Room</a>
+                </li>
+            </ul>
+        </div>
+        <div class="py-3" id="log"></div>
+        <form class="d-flex justify-content-between mt-auto" id="form">
+            <input type="text" class="form-text text-input h-30 w-100 border border-secondary border-radius"
+                   id="message" autofocus>
             <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"
                     integrity="sha384-OERcA2EqjJCMA+/3y+gxIOqMEjwtxJY7qPCqsdltbNJuaOe923+mo//f6V8Qbsw3"
                     crossorigin="anonymous"></script>

@@ -29,7 +29,15 @@ func (client *Client) readPipe() {
 		if decodeError := decoder.Decode(&request); decodeError != nil {
 			log.Fatal(decodeError)
 		}
-		broadcast <- &request
+
+		switch request.Action {
+		case messageAction:
+			broadcast <- &request
+		case createRoomAction:
+			log.Println("createRoom")
+		default:
+			break
+		}
 	}
 }
 
@@ -45,6 +53,7 @@ func (client *Client) writePipe() {
 				closeResponse := Response{
 					Data:   map[string]interface{}{"message": "connection closed"},
 					Status: "ok",
+					Event:  messageEvent,
 				}
 
 				client.connection.WriteJSON(closeResponse)
@@ -57,8 +66,9 @@ func (client *Client) writePipe() {
 			}
 
 			messageResponse := Response{
-				Data:   map[string]interface{}{"message": request.Message},
+				Data:   map[string]interface{}{"message": request.Data["message"]},
 				Status: "ok",
+				Event:  messageEvent,
 			}
 
 			json.NewEncoder(writer).Encode(messageResponse)
@@ -68,8 +78,9 @@ func (client *Client) writePipe() {
 			for i := 0; i < queueCount; i++ {
 				queuedRequest := <-client.send
 				queuedMessageResponse := Response{
-					Data:   map[string]interface{}{"message": queuedRequest.Message},
+					Data:   map[string]interface{}{"message": queuedRequest.Data["message"]},
 					Status: "ok",
+					Event:  messageEvent,
 				}
 
 				json.NewEncoder(writer).Encode(queuedMessageResponse)
