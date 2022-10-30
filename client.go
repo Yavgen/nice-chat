@@ -10,6 +10,7 @@ import (
 type Client struct {
 	connection *websocket.Conn
 	send       chan *Request
+	token      string
 }
 
 func (client *Client) readPipe() {
@@ -35,6 +36,19 @@ func (client *Client) readPipe() {
 			broadcast <- &request
 		case createRoomAction:
 			log.Println("createRoom")
+		case getUsersAction:
+			var usersNames []string
+			for user := range registeredUsers {
+				usersNames = append(usersNames, user)
+			}
+
+			addUsersResponse := Response{
+				Data:   map[string]interface{}{"users": usersNames},
+				Status: "ok",
+				Event:  addUsersEvent,
+			}
+
+			client.connection.WriteJSON(addUsersResponse)
 		default:
 			break
 		}
