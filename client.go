@@ -133,8 +133,6 @@ func (client *Client) writePipe() {
 				return
 			}
 		case <-ticker.C:
-			client.connection.SetWriteDeadline(time.Now().Add(writeWait))
-
 			pingResponse := Response{
 				Data:   map[string]interface{}{"message": "ping"},
 				Status: "ok",
