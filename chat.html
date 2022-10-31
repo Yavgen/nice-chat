@@ -10,16 +10,15 @@
           integrity="sha384-Zenh87qX5JnK2Jl0vWa8Ck2rdkQ2Bzep5IDxbcnCeuOxjzrPF/et3URy9Bv1WTRi" crossorigin="anonymous">
     <script type="text/javascript">
         window.onload = function () {
+            let token
             let connection
             let message = document.getElementById("message");
             let log = document.getElementById("log");
-            localStorage.setItem('login', 'false')
-            localStorage.removeItem('token')
 
-            function appendLog(message) {
+            function appendLog(data) {
                 const doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
                 let item = document.createElement("div");
-                item.innerText = message;
+                item.innerHTML = `<b>${data.user}</b>: ${data.message}`;
                 log.appendChild(item);
                 if (doScroll) {
                     log.scrollTop = log.scrollHeight - log.clientHeight;
@@ -37,33 +36,48 @@
             }
 
             function appendRoom(name) {
+                if (!connection) {
+                    return false;
+                }
                 const parent = addButton.parentElement;
                 parent.insertAdjacentHTML("beforebegin", `<li class="nav-item"><a class="nav-link" href="#">${name}</a></li>`)
             }
 
             function addUsers(users) {
+                if (!connection) {
+                    return false;
+                }
                 document.querySelectorAll(".user").forEach(el => el.remove());
                 const parent = document.getElementById('usersHeader')
                 users.forEach(user => parent.insertAdjacentHTML("beforeend", `<div class="user">${user}</div>`))
             }
 
+            function pong() {
+                let request = makeRequest('pong', {message: "pong"})
+                connection.send(JSON.stringify(request));
+            }
+
             function makeRequest(action, data = {}) {
-                if(localStorage.getItem('login') === false) {
+                if (!connection) {
+                    return false;
+                }
+                if (!token) {
                     return false
                 }
 
                 return {
-                    token: localStorage.getItem('token'),
+                    token: token,
                     data: data,
                     action: action
                 };
             }
 
-            const refreshUsers = function(){
+            const refreshUsers = function () {
                 if (!connection) {
                     return false;
                 }
 
+                //todo: добавить вывод пользователей по комнатам
                 const request = makeRequest('getUsers')
 
                 connection.send(JSON.stringify(request));
@@ -73,7 +87,7 @@
 
             document.getElementById('loginForm').onsubmit = function () {
 
-               async function doRequest() {
+                async function doRequest() {
                     let url = 'http://' + document.location.host + '/login';
                     let data = {
                         'name': document.getElementById('loginName').value,
@@ -97,17 +111,39 @@
                 }
 
                 doRequest().then(data => {
-                    localStorage.setItem('login', 'true');
-                    localStorage.setItem('token', data.token)
-
+                    token = data.token;
                     document.getElementById('loginForm').remove();
+                    connection = new WebSocket("ws://" + document.location.host + "/ws");
+
+                    connection.onmessage = function (evt) {
+                        let response = JSON.parse(evt.data);
+                        switch (response.event) {
+                            case 'message':
+                                appendLog(response.data);
+                                break;
+                            case 'appendRoom':
+                                appendRoom(response.data.room)
+                                break;
+                            case 'addUsers':
+                                addUsers(response.data.users)
+                                break;
+                            case 'ping':
+                                pong()
+                                break;
+                        }
+                    };
+
+                    connection.onclose = function (evt) {
+                        connection = false;
+                        appendLog({message: "Your browser does not support WebSockets", user: ""});
+                    };
                 });
 
                 return false
             };
 
             document.getElementById('chatForm').onsubmit = function () {
-                if (localStorage.getItem('login') === 'false') {
+                if (!token) {
                     return false;
                 }
                 if (!connection) {
@@ -128,30 +164,6 @@
             };
             const addButton = document.getElementById("addButton");
             addButton.addEventListener("click", createRoom);
-
-            if (window["WebSocket"]) {
-                connection = new WebSocket("ws://" + document.location.host + "/ws");
-                connection.onclose = function (evt) {
-                    appendLog("Connection closed");
-                };
-                connection.onmessage = function (evt) {
-                    let response = JSON.parse(evt.data);
-
-                    switch (response.event) {
-                        case 'message':
-                            appendLog(response.data.message);
-                            break;
-                        case 'appendRoom':
-                            appendRoom(response.data.room)
-                            break;
-                        case 'addUsers':
-                            addUsers(response.data.users)
-                            break;
-                    }
-                };
-            } else {
-                appendLog("Your browser does not support WebSockets");
-            }
         }
     </script>
 </head>
@@ -163,6 +175,7 @@
     #users {
         width: 80px;
     }
+
     .form-text {
         outline: none;
     }

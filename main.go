@@ -35,6 +35,8 @@ const messageEvent = "message"
 const connectedEvent = "connected"
 const connectionClosedEvent = "connectionClosed"
 const addUsersEvent = "addUsers"
+const pingEvent = "ping"
+const pongAction = "pong"
 
 func main() {
 	go run()
@@ -71,6 +73,7 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 	if user, ok := registeredUsers[loginRequest.Name]; ok {
 		if user.Password == loginRequest.Password {
 			user.Token = generateToken()
+			loginUsers[user.Token] = user
 
 			loginResponse := Response{
 				Data:   map[string]interface{}{"token": user.Token},
@@ -80,7 +83,6 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 
 			writer.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(writer).Encode(loginResponse)
-			loginUsers[user.Token] = user
 		} else {
 			http.Error(writer, "Password wrong!", http.StatusForbidden)
 			return
@@ -92,6 +94,7 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 			Token:    generateToken(),
 		}
 		registeredUsers[loginRequest.Name] = user
+		loginUsers[user.Token] = user
 
 		registerResponse := Response{
 			Data:   map[string]interface{}{"token": registeredUsers[loginRequest.Name].Token},
@@ -101,7 +104,6 @@ func loginHandler(writer http.ResponseWriter, request *http.Request) {
 
 		writer.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(writer).Encode(registerResponse)
-		loginUsers[user.Token] = user
 	}
 }
 
@@ -127,23 +129,26 @@ func ServeWs(writer http.ResponseWriter, request *http.Request) {
 
 	if readError != nil {
 		log.Printf("client read error %v", readError)
-		http.Error(writer, "Bad request", http.StatusBadRequest)
+		return
 	}
 
 	var connectionRequest Request
 	decoder := json.NewDecoder(bytes.NewReader(message))
 
 	if decodeError := decoder.Decode(&connectionRequest); decodeError != nil {
-		log.Fatal(decodeError)
-	}
-
-	if _, ok := loginUsers[connectionRequest.Token]; !ok {
-		http.Error(writer, "Password wrong!", http.StatusForbidden)
+		log.Println(decodeError)
 		return
 	}
 
+	if _, ok := loginUsers[connectionRequest.Token]; !ok {
+		return
+	}
+
+	connectedClient := &Client{connection: connection, send: make(chan *Request, 255), token: connectionRequest.Token}
+	user := loginUsers[connectionRequest.Token]
+
 	connectedResponse := Response{
-		Data:   map[string]interface{}{"message": "connected"},
+		Data:   map[string]interface{}{"message": "connected", "user": user.Name},
 		Status: "ok",
 		Event:  messageEvent,
 	}
@@ -155,7 +160,6 @@ func ServeWs(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	connectedClient := &Client{connection: connection, send: make(chan *Request, 255), token: connectionRequest.Token}
 	register <- connectedClient
 	go connectedClient.readPipe()
 	go connectedClient.writePipe()
@@ -167,14 +171,12 @@ func run() {
 		case client := <-register:
 			clients[client] = client.token
 		case client := <-unregister:
-
 			if _, ok := clients[client]; ok {
 				delete(clients, client)
 				close(client.send)
 			}
 
 		case message := <-broadcast:
-
 			for client := range clients {
 				select {
 				case client.send <- message:
@@ -183,7 +185,6 @@ func run() {
 					delete(clients, client)
 				}
 			}
-
 		}
 	}
 }

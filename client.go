@@ -5,6 +5,18 @@ import (
 	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
+	"time"
+)
+
+const (
+	// Time allowed to write a message to the peer.
+	writeWait = 10 * time.Second
+
+	// Time allowed to read the next pong message from the peer.
+	pongWait = 60 * time.Second
+
+	// Send pings to peer with this period. Must be less than pongWait.
+	pingPeriod = (pongWait * 9) / 10
 )
 
 type Client struct {
@@ -16,11 +28,13 @@ type Client struct {
 func (client *Client) readPipe() {
 	defer func() {
 		client.connection.Close()
+		delete(loginUsers, client.token)
 	}()
 
 	for {
 		_, message, readError := client.connection.ReadMessage()
 		if readError != nil {
+			delete(loginUsers, client.token)
 			log.Printf("client read error %v", readError)
 			break
 		}
@@ -32,14 +46,22 @@ func (client *Client) readPipe() {
 		}
 
 		switch request.Action {
+		case pongAction:
 		case messageAction:
 			broadcast <- &request
 		case createRoomAction:
 			log.Println("createRoom")
 		case getUsersAction:
+			usersUniqueNames := make(map[string]bool)
+
+			for _, user := range loginUsers {
+				usersUniqueNames[user.Name] = true
+			}
+
 			var usersNames []string
-			for user := range registeredUsers {
-				usersNames = append(usersNames, user)
+
+			for name, _ := range usersUniqueNames {
+				usersNames = append(usersNames, name)
 			}
 
 			addUsersResponse := Response{
@@ -56,14 +78,17 @@ func (client *Client) readPipe() {
 }
 
 func (client *Client) writePipe() {
+	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		client.connection.Close()
+		delete(loginUsers, client.token)
 	}()
 
 	for {
 		select {
 		case request, ok := <-client.send:
 			if !ok {
+				delete(loginUsers, client.token)
 				closeResponse := Response{
 					Data:   map[string]interface{}{"message": "connection closed"},
 					Status: "ok",
@@ -76,11 +101,14 @@ func (client *Client) writePipe() {
 			writer, writerError := client.connection.NextWriter(websocket.TextMessage)
 
 			if writerError != nil {
+				delete(loginUsers, client.token)
 				return
 			}
 
+			user := loginUsers[request.Token]
+
 			messageResponse := Response{
-				Data:   map[string]interface{}{"message": request.Data["message"]},
+				Data:   map[string]interface{}{"message": request.Data["message"], "user": user.Name},
 				Status: "ok",
 				Event:  messageEvent,
 			}
@@ -91,8 +119,9 @@ func (client *Client) writePipe() {
 
 			for i := 0; i < queueCount; i++ {
 				queuedRequest := <-client.send
+				queuedUser := loginUsers[queuedRequest.Token]
 				queuedMessageResponse := Response{
-					Data:   map[string]interface{}{"message": queuedRequest.Data["message"]},
+					Data:   map[string]interface{}{"message": queuedRequest.Data["message"], "user": queuedUser.Name},
 					Status: "ok",
 					Event:  messageEvent,
 				}
@@ -103,7 +132,26 @@ func (client *Client) writePipe() {
 			if writerCloseError := writer.Close(); writerCloseError != nil {
 				return
 			}
+		case <-ticker.C:
+			client.connection.SetWriteDeadline(time.Now().Add(writeWait))
+
+			pingResponse := Response{
+				Data:   map[string]interface{}{"message": "ping"},
+				Status: "ok",
+				Event:  pingEvent,
+			}
+
+			writer, writerError := client.connection.NextWriter(websocket.TextMessage)
+
+			if writerError != nil {
+				delete(loginUsers, client.token)
+				return
+			}
+
+			if pingError := json.NewEncoder(writer).Encode(pingResponse); pingError != nil {
+				delete(loginUsers, client.token)
+				return
+			}
 		}
 	}
-
 }
