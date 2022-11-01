@@ -50,7 +50,33 @@ func (client *Client) readPipe() {
 		case messageAction:
 			broadcast <- &request
 		case createRoomAction:
-			log.Println("createRoom")
+			if _, ok := loginUsers[request.Token]; !ok {
+				break
+			}
+
+			if roomName, ok := request.Data["roomName"]; ok {
+				if _, isRoomExist := rooms[roomName.(string)]; isRoomExist {
+					break
+				}
+				var roomClients []*Client
+				roomClients = append(roomClients, client)
+
+				room := Room{
+					OwnerToken: client.token,
+					Clients:    roomClients,
+				}
+
+				rooms[roomName.(string)] = &room
+
+				appendRoomResponse := Response{
+					Data:   map[string]interface{}{"room": roomName},
+					Status: "ok",
+					Event:  appendRoomEvent,
+				}
+
+				client.connection.WriteJSON(appendRoomResponse)
+			}
+
 		case getUsersAction:
 			usersUniqueNames := make(map[string]bool)
 

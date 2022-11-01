@@ -30,7 +30,7 @@
                     return false;
                 }
 
-                const request = makeRequest('roomCreate', {'roomName': 'maggot'})
+                const request = makeRequest('createRoom', {'roomName': 'maggot'})
 
                 connection.send(JSON.stringify(request));
             }
@@ -162,8 +162,7 @@
                 message.value = "";
                 return false;
             };
-            const addButton = document.getElementById("addButton");
-            addButton.addEventListener("click", createRoom);
+            document.getElementById("addButton").addEventListener("click", createRoom)
         }
     </script>
 </head>

@@ -24,6 +24,7 @@ var (
 	clients         = make(map[*Client]string)
 	loginUsers      = make(map[string]*User)
 	registeredUsers = make(map[string]*User)
+	rooms           = make(map[string]*Room)
 )
 
 const createRoomAction = "createRoom"
