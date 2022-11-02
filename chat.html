@@ -30,7 +30,8 @@
                     return false;
                 }
 
-                const request = makeRequest('createRoom', {'roomName': 'maggot'})
+                const roomName = prompt("Enter room name")
+                const request = makeRequest('createRoom', {'roomName': roomName})
 
                 connection.send(JSON.stringify(request));
             }
@@ -40,7 +41,19 @@
                     return false;
                 }
                 const parent = addButton.parentElement;
-                parent.insertAdjacentHTML("beforebegin", `<li class="nav-item"><a class="nav-link" href="#">${name}</a></li>`)
+                parent.insertAdjacentHTML("beforebegin", `<li class="nav-item"><a class="nav-link room-tab" href="#">${name}</a></li>`)
+                let roomTabs = document.getElementsByClassName('room-tab')
+
+                for(let tab of roomTabs) {
+                    tab.addEventListener("click", (e) => {
+                        for (let item of roomTabs) {
+                            item.classList.remove('active');
+                            item.removeAttribute('id')
+                        }
+                        e.target.classList.toggle("active");
+                        e.target.id="activeRoom"
+                    });
+                }
             }
 
             function addUsers(users) {
@@ -194,7 +207,7 @@
             <div class="h-20">
                 <ul class="nav nav-tabs">
                     <li class="nav-item">
-                        <a class="nav-link active" href="#">Active</a>
+                        <a class="nav-link room-tab active" href="#">Public</a>
                     </li>
                     <li class="nav-item">
                         <a id="addButton" class="nav-link add-button" href="#">Add Room</a>

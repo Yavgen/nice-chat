@@ -28,6 +28,7 @@ var (
 )
 
 const createRoomAction = "createRoom"
+const appendUserToRoomAction = "appendUserToRoom"
 const messageAction = "message"
 const getUsersAction = "getUsers"
 
