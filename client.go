@@ -50,6 +50,10 @@ func (client *Client) readPipe() {
 		case messageAction:
 			broadcast <- &request
 		case createRoomAction:
+			if _, ok := request.Data["roomName"].(string); !ok {
+				break
+			}
+
 			if _, ok := loginUsers[request.Token]; !ok {
 				break
 			}
@@ -58,8 +62,15 @@ func (client *Client) readPipe() {
 				if _, isRoomExist := rooms[roomName.(string)]; isRoomExist {
 					break
 				}
-				var roomClients []*Client
-				roomClients = append(roomClients, client)
+
+				var roomClients []*RoomClient
+
+				roomClient := &RoomClient{
+					connection: client,
+					userName:   loginUsers[request.Token].Name,
+				}
+
+				roomClients = append(roomClients, roomClient)
 
 				room := Room{
 					OwnerToken: client.token,
@@ -76,8 +87,47 @@ func (client *Client) readPipe() {
 
 				client.connection.WriteJSON(appendRoomResponse)
 			}
+		case appendUserToRoomAction:
+			if _, ok := request.Data["userName"].(string); !ok {
+				break
+			}
+
+			if _, ok := loginUsers[request.Token]; !ok {
+				break
+			}
+
+			var userClientToAppend *Client
+
+			if registeredUser, isRegisteredUser := registeredUsers[request.Data["userName"].(string)]; isRegisteredUser {
+				if userClient, isUserClient := clients[registeredUser.Token]; isUserClient {
+					userClientToAppend = userClient
+				} else {
+					break
+				}
+			}
+
+			if roomName, ok := request.Data["roomName"].(string); ok {
+				log.Println(roomName)
+				if room, isRoomExist := rooms[roomName]; isRoomExist {
+					roomClient := &RoomClient{
+						connection: userClientToAppend,
+						userName:   request.Data["userName"].(string),
+					}
+					room.Clients = append(room.Clients, roomClient)
+					rooms[roomName] = room
+
+					appendRoomResponse := Response{
+						Data:   map[string]interface{}{"room": roomName},
+						Status: "ok",
+						Event:  appendRoomEvent,
+					}
+
+					userClientToAppend.connection.WriteJSON(appendRoomResponse)
+				}
+			}
 
 		case getUsersAction:
+			//TODO сделать вывод пользователей по комнатам
 			usersUniqueNames := make(map[string]bool)
 
 			for _, user := range loginUsers {

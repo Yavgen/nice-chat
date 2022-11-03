@@ -14,6 +14,7 @@
             let connection
             let message = document.getElementById("message");
             let log = document.getElementById("log");
+            let activeRoom = "Public";
 
             function appendLog(data) {
                 const doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
@@ -40,20 +41,36 @@
                 if (!connection) {
                     return false;
                 }
-                const parent = addButton.parentElement;
+                const parent = document.getElementById("addRoomButton").parentElement;
                 parent.insertAdjacentHTML("beforebegin", `<li class="nav-item"><a class="nav-link room-tab" href="#">${name}</a></li>`)
                 let roomTabs = document.getElementsByClassName('room-tab')
 
-                for(let tab of roomTabs) {
+                for (let tab of roomTabs) {
                     tab.addEventListener("click", (e) => {
                         for (let item of roomTabs) {
                             item.classList.remove('active');
                             item.removeAttribute('id')
                         }
                         e.target.classList.toggle("active");
-                        e.target.id="activeRoom"
+                        e.target.id = "activeRoom"
+
+                        activeRoom = e.target.text
+
+                        if (activeRoom !== "Public") {
+                            document.getElementById("addRoomButton").parentElement.insertAdjacentHTML("afterend", `<li class="nav-item"><a id="addUserToRoomButton" class="nav-link" href="#">Add Users</li>`)
+                            document.getElementById("addUserToRoomButton").addEventListener("click", appendUserToRoom)
+                        } else {
+                            document.getElementById("addUserToRoomButton").parentElement.remove()
+                        }
                     });
                 }
+            }
+
+            function appendUserToRoom() {
+                const userName = prompt("enter username")
+                const request = makeRequest('appendUserToRoom', {'userName': userName, 'roomName': activeRoom})
+
+                connection.send(JSON.stringify(request));
             }
 
             function addUsers(users) {
@@ -175,7 +192,7 @@
                 message.value = "";
                 return false;
             };
-            document.getElementById("addButton").addEventListener("click", createRoom)
+            document.getElementById("addRoomButton").addEventListener("click", createRoom)
         }
     </script>
 </head>
@@ -186,6 +203,7 @@
 
     #users {
         width: 80px;
+        overflow-x: scroll;
     }
 
     .form-text {
@@ -200,7 +218,7 @@
 <body>
 <div class="container">
     <div class="w-50 mx-auto border border-primary rounded p-4 d-flex">
-        <div id="users" class="w-20 mt-5 me-2 text-break">
+        <div id="users" class="w-20 mt-5 me-2">
             <div id="usersHeader"><b>Users:</b></div>
         </div>
         <div class="box d-flex flex-column w-100">
@@ -210,7 +228,7 @@
                         <a class="nav-link room-tab active" href="#">Public</a>
                     </li>
                     <li class="nav-item">
-                        <a id="addButton" class="nav-link add-button" href="#">Add Room</a>
+                        <a id="addRoomButton" class="nav-link add-button" href="#">Add Room</a>
                     </li>
                 </ul>
             </div>

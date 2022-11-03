@@ -21,7 +21,7 @@ var (
 	broadcast       = make(chan *Request)
 	register        = make(chan *Client)
 	unregister      = make(chan *Client)
-	clients         = make(map[*Client]string)
+	clients         = make(map[string]*Client)
 	loginUsers      = make(map[string]*User)
 	registeredUsers = make(map[string]*User)
 	rooms           = make(map[string]*Room)
@@ -171,20 +171,20 @@ func run() {
 	for {
 		select {
 		case client := <-register:
-			clients[client] = client.token
+			clients[client.token] = client
 		case client := <-unregister:
-			if _, ok := clients[client]; ok {
-				delete(clients, client)
+			if _, ok := clients[client.token]; ok {
+				delete(clients, client.token)
 				close(client.send)
 			}
 
 		case message := <-broadcast:
-			for client := range clients {
+			for _, client := range clients {
 				select {
 				case client.send <- message:
 				default:
 					close(client.send)
-					delete(clients, client)
+					delete(clients, client.token)
 				}
 			}
 		}
