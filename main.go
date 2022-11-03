@@ -152,7 +152,7 @@ func ServeWs(writer http.ResponseWriter, request *http.Request) {
 	user := loginUsers[connectionRequest.Token]
 
 	connectedResponse := Response{
-		Data:   map[string]interface{}{"message": "connected", "user": user.Name},
+		Data:   map[string]interface{}{"message": "connected", "user": user.Name, "roomName": publicRoom},
 		Status: "ok",
 		Event:  messageEvent,
 	}

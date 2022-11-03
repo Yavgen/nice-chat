@@ -87,7 +87,7 @@ func (client *Client) readPipe() {
 					break
 				}
 
-				var roomClients map[string]*RoomClient
+				roomClients := make(map[string]*RoomClient)
 
 				roomClient := &RoomClient{
 					connection: client,
@@ -206,7 +206,7 @@ func (client *Client) writePipe() {
 			if !ok {
 				delete(loginUsers, client.token)
 				closeResponse := Response{
-					Data:   map[string]interface{}{"message": "connection closed"},
+					Data:   map[string]interface{}{"message": "connection closed", "roomName": publicRoom},
 					Status: "ok",
 					Event:  messageEvent,
 				}

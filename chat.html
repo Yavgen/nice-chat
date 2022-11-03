@@ -13,14 +13,15 @@
             let token
             let connection
             let message = document.getElementById("message");
-            let log = document.getElementById("log");
             let activeRoom = "Public";
 
-            function appendLog(data) {
+            function appendMessage(data) {
+                const log = document.getElementById(data.roomName);
                 const doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
                 let item = document.createElement("div");
                 item.innerHTML = `<b>${data.user}</b>: ${data.message}`;
                 log.appendChild(item);
+
                 if (doScroll) {
                     log.scrollTop = log.scrollHeight - log.clientHeight;
                 }
@@ -59,9 +60,21 @@
                         if (activeRoom !== "Public") {
                             document.getElementById("addRoomButton").parentElement.insertAdjacentHTML("afterend", `<li class="nav-item"><a id="addUserToRoomButton" class="nav-link" href="#">Add Users</li>`)
                             document.getElementById("addUserToRoomButton").addEventListener("click", appendUserToRoom)
+                            if(!document.getElementById(activeRoom)) {
+                                document.getElementById("Public").insertAdjacentHTML("afterend", `<div class="py-3 ps-2 log" id="${activeRoom}"></div>`)
+                            }
                         } else {
                             document.getElementById("addUserToRoomButton").parentElement.remove()
                         }
+
+                        const messageLogs = document.getElementsByClassName('log');
+
+                        for (let messageLog of messageLogs) {
+                            messageLog.classList.remove('active-log');
+                            messageLog.addEventListener("click", (e) => { e.target.classList.toggle("active-log"); });
+                        }
+
+                        document.getElementById(activeRoom).classList.toggle("active-log");
                     });
                 }
             }
@@ -107,7 +120,6 @@
                     return false;
                 }
 
-                //todo: добавить вывод пользователей по комнатам
                 const request = makeRequest('getUsers', {'roomName': activeRoom})
 
                 connection.send(JSON.stringify(request));
@@ -149,7 +161,7 @@
                         let response = JSON.parse(evt.data);
                         switch (response.event) {
                             case 'message':
-                                appendLog(response.data);
+                                appendMessage(response.data);
                                 break;
                             case 'appendRoom':
                                 appendRoom(response.data.room)
@@ -165,7 +177,7 @@
 
                     connection.onclose = function (evt) {
                         connection = false;
-                        appendLog({message: "Your browser does not support WebSockets", user: ""});
+                        appendMessage({message: 'connection closed', user: 'chat'});
                     };
                 });
 
@@ -214,6 +226,13 @@
         border: none !important;
     }
 
+    .log {
+        display: none;
+    }
+
+    .active-log {
+        display: block;
+    }
 </style>
 <body>
 <div class="container">
@@ -232,7 +251,7 @@
                     </li>
                 </ul>
             </div>
-            <div class="py-3 ps-2" id="log"></div>
+            <div class="py-3 ps-2 log active-log" id="Public"></div>
             <form id="loginForm" class="mt-auto ps-2">
                 <h1>Pleause log in</h1>
                 <div class="form-group">
