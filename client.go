@@ -47,7 +47,31 @@ func (client *Client) readPipe() {
 
 		switch request.Action {
 		case pongAction:
+			break
 		case messageAction:
+			if _, ok := request.Data["roomName"].(string); !ok {
+				break
+			}
+
+			if _, isUserLogin := loginUsers[request.Token]; !isUserLogin {
+				break
+			}
+
+			if request.Data["roomName"].(string) == publicRoom {
+				broadcast <- &request
+				break
+			}
+
+			roomName := request.Data["roomName"].(string)
+
+			if _, isRoomExist := rooms[roomName]; !isRoomExist {
+				break
+			}
+
+			if _, isClientInRoom := rooms[roomName].Clients[request.Token]; !isClientInRoom {
+				break
+			}
+
 			broadcast <- &request
 		case createRoomAction:
 			if _, ok := request.Data["roomName"].(string); !ok {
@@ -63,14 +87,14 @@ func (client *Client) readPipe() {
 					break
 				}
 
-				var roomClients []*RoomClient
+				var roomClients map[string]*RoomClient
 
 				roomClient := &RoomClient{
 					connection: client,
 					userName:   loginUsers[request.Token].Name,
 				}
 
-				roomClients = append(roomClients, roomClient)
+				roomClients[request.Token] = roomClient
 
 				room := Room{
 					OwnerToken: client.token,
@@ -107,13 +131,12 @@ func (client *Client) readPipe() {
 			}
 
 			if roomName, ok := request.Data["roomName"].(string); ok {
-				log.Println(roomName)
-				if room, isRoomExist := rooms[roomName]; isRoomExist {
+				if room, isRoomExist := rooms[request.Data["roomName"].(string)]; isRoomExist {
 					roomClient := &RoomClient{
 						connection: userClientToAppend,
 						userName:   request.Data["userName"].(string),
 					}
-					room.Clients = append(room.Clients, roomClient)
+					room.Clients[userClientToAppend.token] = roomClient
 					rooms[roomName] = room
 
 					appendRoomResponse := Response{
@@ -127,17 +150,34 @@ func (client *Client) readPipe() {
 			}
 
 		case getUsersAction:
-			//TODO сделать вывод пользователей по комнатам
-			usersUniqueNames := make(map[string]bool)
-
-			for _, user := range loginUsers {
-				usersUniqueNames[user.Name] = true
-			}
-
 			var usersNames []string
 
-			for name, _ := range usersUniqueNames {
-				usersNames = append(usersNames, name)
+			if _, ok := request.Data["roomName"].(string); !ok {
+				break
+			}
+
+			if request.Data["roomName"].(string) == publicRoom {
+				usersUniqueNames := make(map[string]bool)
+
+				for _, user := range loginUsers {
+					usersUniqueNames[user.Name] = true
+				}
+
+				for name, _ := range usersUniqueNames {
+					usersNames = append(usersNames, name)
+				}
+			} else {
+				if _, ok := request.Data["roomName"].(string); !ok {
+					break
+				}
+
+				roomName := request.Data["roomName"].(string)
+
+				if room, isRoomExist := rooms[roomName]; isRoomExist {
+					for _, roomClient := range room.Clients {
+						usersNames = append(usersNames, roomClient.userName)
+					}
+				}
 			}
 
 			addUsersResponse := Response{
@@ -184,7 +224,11 @@ func (client *Client) writePipe() {
 			user := loginUsers[request.Token]
 
 			messageResponse := Response{
-				Data:   map[string]interface{}{"message": request.Data["message"], "user": user.Name},
+				Data: map[string]interface{}{
+					"message":  request.Data["message"],
+					"user":     user.Name,
+					"roomName": request.Data["roomName"].(string),
+				},
 				Status: "ok",
 				Event:  messageEvent,
 			}
@@ -197,7 +241,11 @@ func (client *Client) writePipe() {
 				queuedRequest := <-client.send
 				queuedUser := loginUsers[queuedRequest.Token]
 				queuedMessageResponse := Response{
-					Data:   map[string]interface{}{"message": queuedRequest.Data["message"], "user": queuedUser.Name},
+					Data: map[string]interface{}{
+						"message":  queuedRequest.Data["message"],
+						"user":     queuedUser.Name,
+						"roomName": queuedRequest.Data["roomName"].(string),
+					},
 					Status: "ok",
 					Event:  messageEvent,
 				}

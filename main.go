@@ -40,6 +40,8 @@ const addUsersEvent = "addUsers"
 const pingEvent = "ping"
 const pongAction = "pong"
 
+const publicRoom = "Public"
+
 func main() {
 	go run()
 	router := mux.NewRouter()

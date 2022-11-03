@@ -7,5 +7,5 @@ type RoomClient struct {
 
 type Room struct {
 	OwnerToken string
-	Clients    []*RoomClient
+	Clients    map[string]*RoomClient
 }

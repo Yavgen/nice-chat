@@ -108,7 +108,7 @@
                 }
 
                 //todo: добавить вывод пользователей по комнатам
-                const request = makeRequest('getUsers')
+                const request = makeRequest('getUsers', {'roomName': activeRoom})
 
                 connection.send(JSON.stringify(request));
             };
@@ -184,8 +184,8 @@
                 }
 
                 const request = makeRequest('message', {
-                    message: message.value,
-                    room: 'roooooom'
+                    'message': message.value,
+                    'roomName': activeRoom
                 })
 
                 connection.send(JSON.stringify(request));
