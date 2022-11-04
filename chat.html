@@ -60,7 +60,7 @@
                         if (activeRoom !== "Public") {
                             document.getElementById("addRoomButton").parentElement.insertAdjacentHTML("afterend", `<li class="nav-item"><a id="addUserToRoomButton" class="nav-link" href="#">Add Users</li>`)
                             document.getElementById("addUserToRoomButton").addEventListener("click", appendUserToRoom)
-                            if(!document.getElementById(activeRoom)) {
+                            if (!document.getElementById(activeRoom)) {
                                 document.getElementById("Public").insertAdjacentHTML("afterend", `<div class="py-3 ps-2 log" id="${activeRoom}"></div>`)
                             }
                         } else {
@@ -71,7 +71,9 @@
 
                         for (let messageLog of messageLogs) {
                             messageLog.classList.remove('active-log');
-                            messageLog.addEventListener("click", (e) => { e.target.classList.toggle("active-log"); });
+                            messageLog.addEventListener("click", (e) => {
+                                e.target.classList.toggle("active-log");
+                            });
                         }
 
                         document.getElementById(activeRoom).classList.toggle("active-log");
@@ -130,7 +132,7 @@
             document.getElementById('loginForm').onsubmit = function () {
 
                 async function doRequest() {
-                    let url = 'http://' + document.location.host + '/login';
+                    let url = window.location.protocol + '//' + document.location.host + '/login';
                     let data = {
                         'name': document.getElementById('loginName').value,
                         'password': document.getElementById('loginName').password
@@ -155,7 +157,11 @@
                 doRequest().then(data => {
                     token = data.token;
                     document.getElementById('loginForm').remove();
-                    connection = new WebSocket("ws://" + document.location.host + "/ws");
+                    let wsProtocol = 'ws:'
+                    if (window.location.protocol === 'https:') {
+                        wsProtocol = 'wss:';
+                    }
+                    connection = new WebSocket(wsProtocol + "//" + document.location.host + "/ws");
 
                     connection.onmessage = function (evt) {
                         let response = JSON.parse(evt.data);
