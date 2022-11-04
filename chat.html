@@ -216,12 +216,12 @@
 </head>
 <style>
     .box {
-        height: 95vh;
+        height: 91vh;
     }
 
     #users {
         width: 80px;
-        overflow-x: scroll;
+        overflow-x: auto;
     }
 
     .form-text {
@@ -234,6 +234,7 @@
 
     .log {
         display: none;
+        overflow-y: auto;
     }
 
     .active-log {
@@ -241,7 +242,7 @@
     }
 </style>
 <body>
-<div class="container">
+<div class="container my-3">
     <div class="w-50 mx-auto border border-primary rounded p-4 d-flex">
         <div id="users" class="w-20 mt-5 me-2">
             <div id="usersHeader"><b>Users:</b></div>
