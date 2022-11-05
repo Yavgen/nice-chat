@@ -28,13 +28,13 @@ type Client struct {
 func (client *Client) readPipe() {
 	defer func() {
 		client.connection.Close()
-		delete(loginUsers, client.token)
+		logoutClient(client.token)
 	}()
 
 	for {
 		_, message, readError := client.connection.ReadMessage()
 		if readError != nil {
-			delete(loginUsers, client.token)
+			logoutClient(client.token)
 			log.Printf("client read error %v", readError)
 			break
 		}
@@ -197,14 +197,14 @@ func (client *Client) writePipe() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		client.connection.Close()
-		delete(loginUsers, client.token)
+		logoutClient(client.token)
 	}()
 
 	for {
 		select {
 		case request, ok := <-client.send:
 			if !ok {
-				delete(loginUsers, client.token)
+				logoutClient(client.token)
 				closeResponse := Response{
 					Data:   map[string]interface{}{"message": "connection closed", "roomName": publicRoom},
 					Status: "ok",
@@ -217,7 +217,7 @@ func (client *Client) writePipe() {
 			writer, writerError := client.connection.NextWriter(websocket.TextMessage)
 
 			if writerError != nil {
-				delete(loginUsers, client.token)
+				logoutClient(client.token)
 				return
 			}
 
@@ -266,14 +266,23 @@ func (client *Client) writePipe() {
 			writer, writerError := client.connection.NextWriter(websocket.TextMessage)
 
 			if writerError != nil {
-				delete(loginUsers, client.token)
+				logoutClient(client.token)
 				return
 			}
 
 			if pingError := json.NewEncoder(writer).Encode(pingResponse); pingError != nil {
-				delete(loginUsers, client.token)
+				logoutClient(client.token)
 				return
 			}
 		}
 	}
+}
+
+func logoutClient(clientToken string) {
+	for _, room := range rooms {
+		if _, isClientInRoom := room.Clients[clientToken]; isClientInRoom {
+			delete(room.Clients, clientToken)
+		}
+	}
+	delete(loginUsers, clientToken)
 }
