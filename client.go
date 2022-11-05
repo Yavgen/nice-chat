@@ -28,21 +28,21 @@ type Client struct {
 func (client *Client) readPipe() {
 	defer func() {
 		client.connection.Close()
-		logoutClient(client.token)
+		client.logoutClient(client.token)
 	}()
-
+	//TODO добавить pong handler
 	for {
 		_, message, readError := client.connection.ReadMessage()
 		if readError != nil {
-			logoutClient(client.token)
-			log.Printf("client read error %v", readError)
+			client.logoutClient(client.token)
 			break
 		}
 
 		var request Request
 		decoder := json.NewDecoder(bytes.NewReader(message))
 		if decodeError := decoder.Decode(&request); decodeError != nil {
-			log.Fatal(decodeError)
+			log.Println(decodeError)
+			break
 		}
 
 		switch request.Action {
@@ -53,7 +53,7 @@ func (client *Client) readPipe() {
 				break
 			}
 
-			if _, isUserLogin := loginUsers[request.Token]; !isUserLogin {
+			if _, ok := client.isUserLogin(request.Token); !ok {
 				break
 			}
 
@@ -78,7 +78,9 @@ func (client *Client) readPipe() {
 				break
 			}
 
-			if _, ok := loginUsers[request.Token]; !ok {
+			user, isLogin := client.isUserLogin(request.Token)
+
+			if !isLogin {
 				break
 			}
 
@@ -91,7 +93,7 @@ func (client *Client) readPipe() {
 
 				roomClient := &RoomClient{
 					connection: client,
-					userName:   loginUsers[request.Token].Name,
+					userName:   user.Name,
 				}
 
 				roomClients[request.Token] = roomClient
@@ -116,7 +118,7 @@ func (client *Client) readPipe() {
 				break
 			}
 
-			if _, ok := loginUsers[request.Token]; !ok {
+			if _, ok := client.isUserLogin(request.Token); !ok {
 				break
 			}
 
@@ -197,14 +199,14 @@ func (client *Client) writePipe() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		client.connection.Close()
-		logoutClient(client.token)
+		client.logoutClient(client.token)
 	}()
 
 	for {
 		select {
 		case request, ok := <-client.send:
 			if !ok {
-				logoutClient(client.token)
+				client.logoutClient(client.token)
 				closeResponse := Response{
 					Data:   map[string]interface{}{"message": "connection closed", "roomName": publicRoom},
 					Status: "ok",
@@ -214,14 +216,18 @@ func (client *Client) writePipe() {
 				client.connection.WriteJSON(closeResponse)
 			}
 
+			user, isLogin := client.isUserLogin(request.Token)
+
+			if !isLogin {
+				break
+			}
+
 			writer, writerError := client.connection.NextWriter(websocket.TextMessage)
 
 			if writerError != nil {
-				logoutClient(client.token)
+				client.logoutClient(client.token)
 				return
 			}
-
-			user := loginUsers[request.Token]
 
 			messageResponse := Response{
 				Data: map[string]interface{}{
@@ -239,12 +245,19 @@ func (client *Client) writePipe() {
 
 			for i := 0; i < queueCount; i++ {
 				queuedRequest := <-client.send
-				queuedUser := loginUsers[queuedRequest.Token]
+
+				queuedUser, isQueuedLogin := client.isUserLogin(queuedRequest.Token)
+
+				if !isQueuedLogin {
+					client.logoutClient(queuedRequest.Token)
+					continue
+				}
+
 				queuedMessageResponse := Response{
 					Data: map[string]interface{}{
 						"message":  queuedRequest.Data["message"],
 						"user":     queuedUser.Name,
-						"roomName": queuedRequest.Data["roomName"].(string),
+						"roomName": queuedRequest.Data["roomName"],
 					},
 					Status: "ok",
 					Event:  messageEvent,
@@ -266,23 +279,28 @@ func (client *Client) writePipe() {
 			writer, writerError := client.connection.NextWriter(websocket.TextMessage)
 
 			if writerError != nil {
-				logoutClient(client.token)
+				client.logoutClient(client.token)
 				return
 			}
 
 			if pingError := json.NewEncoder(writer).Encode(pingResponse); pingError != nil {
-				logoutClient(client.token)
+				client.logoutClient(client.token)
 				return
 			}
 		}
 	}
 }
 
-func logoutClient(clientToken string) {
+func (client *Client) logoutClient(clientToken string) {
 	for _, room := range rooms {
 		if _, isClientInRoom := room.Clients[clientToken]; isClientInRoom {
 			delete(room.Clients, clientToken)
 		}
 	}
 	delete(loginUsers, clientToken)
+}
+
+func (client *Client) isUserLogin(clientToken string) (*User, bool) {
+	user, ok := loginUsers[clientToken]
+	return user, ok
 }
