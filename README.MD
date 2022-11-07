@@ -1,4 +1,5 @@
 ### Nice-Chat
 
-* build - `go run *.go`
+* `docker-compose build`
+* `docker-compose up`
 * [open many tabs in browser](http://localhost:8080)
