@@ -1,6 +1,6 @@
-package main
+package request
 
-type loginRequest struct {
+type AuthRequest struct {
 	Name     string `json:"name"`
 	Password string `json:"password"`
 }
