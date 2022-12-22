@@ -1,7 +1,8 @@
 # Базовый образ
 FROM golang:1.19
 
-WORKDIR /usr/src/app
+RUN mkdir /app
+WORKDIR /app
 
 COPY ../.. go.mod ./
 COPY ../.. go.sum ./
@@ -11,6 +12,6 @@ COPY ../.. ./
 
 EXPOSE 8080
 
-RUN go build -v -o /usr/local/bin/app ./...
+RUN go build -o main .
 
-CMD ["app"]
+CMD ["/app/main"]
