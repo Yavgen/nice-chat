@@ -7,6 +7,7 @@ import (
 	"chat/internal/client"
 	"chat/internal/request"
 	"encoding/json"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"log"
 )
 
@@ -36,6 +37,17 @@ func (rp ReadPipe) Read(client client.ChatClient) {
 		decoder := json.NewDecoder(bytes.NewReader(message))
 		if decodeError := decoder.Decode(&chatRequest); decodeError != nil {
 			log.Println(decodeError)
+			break
+		}
+
+		validationErr := validation.Errors{
+			"action": validation.Validate(chatRequest.Action, validation.Required, validation.Length(5, 20)),
+			"data":   validation.Validate(chatRequest.Data, validation.Required, validation.Required),
+			"token":  validation.Validate(chatRequest.Token, validation.Required, validation.Length(36, 36)),
+		}.Filter()
+
+		if validationErr != nil {
+			log.Println(validationErr)
 			break
 		}
 

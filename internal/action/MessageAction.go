@@ -4,8 +4,10 @@ import (
 	"chat/internal/client"
 	"chat/internal/domain/store"
 	"chat/internal/request"
+	"chat/internal/request/data"
 	"chat/internal/response"
 	"errors"
+	"github.com/mitchellh/mapstructure"
 )
 
 type MessageAction struct {
@@ -25,27 +27,28 @@ func NewMessageAction(
 	}
 }
 
-func (ma MessageAction) Handle(chatRequest request.ChatRequest) error {
-	user, isUserLogin := ma.loginUserStore.FindUserByToken(chatRequest.Token)
+func (ma MessageAction) Handle(request request.ChatRequest) error {
+	messageRequest := data.NewMessageRequest()
+	err := mapstructure.Decode(request.Data, &messageRequest)
+
+	if err != nil {
+		return err
+	}
+
+	user, isUserLogin := ma.loginUserStore.FindUserByToken(request.Token)
 
 	if !isUserLogin {
 		return errors.New("user not authorized")
 	}
 
-	roomName, isRoomNameValid := chatRequest.Data["roomName"].(string)
+	vErr := messageRequest.Validate()
 
-	if !isRoomNameValid {
-		return errors.New("invalid room name")
+	if vErr != nil {
+		return vErr
 	}
 
-	message, isMessageValid := chatRequest.Data["message"].(string)
-
-	if !isMessageValid {
-		return errors.New("invalid message")
-	}
-
-	isPublicRoom := chatRequest.Data["roomName"].(string) == "Public"
-	messageResponse := response.NewMessageResponse(message, roomName, user.Name())
+	isPublicRoom := messageRequest.RoomName == "Public"
+	messageResponse := response.NewMessageResponse(messageRequest.Message, messageRequest.RoomName, user.Name())
 
 	if isPublicRoom {
 		ma.broadcastCh.Push(messageResponse.ToJson())
@@ -53,7 +56,7 @@ func (ma MessageAction) Handle(chatRequest request.ChatRequest) error {
 		return nil
 	}
 
-	chatRoom, isRoomExist := ma.roomsStore.FindByName(roomName)
+	chatRoom, isRoomExist := ma.roomsStore.FindByName(messageRequest.RoomName)
 
 	if !isRoomExist {
 		return errors.New("room does not exists")
@@ -63,7 +66,6 @@ func (ma MessageAction) Handle(chatRequest request.ChatRequest) error {
 		return errors.New("user not in room")
 	}
 
-	//TODO разделить реквесты по типам
 	ma.broadcastCh.Push(messageResponse.ToJson())
 
 	return nil
